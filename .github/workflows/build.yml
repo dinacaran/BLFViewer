@@ -35,7 +35,7 @@ jobs:
       # ── 4. Build with PyInstaller ─────────────────────────────────────────
       - name: Build portable EXE
         run: |
-          pyinstaller BLFViewerPortable.spec
+          pyinstaller BLFViewer.spec
 
       # ── 5. Verify build output exists ─────────────────────────────────────
       - name: Verify output
