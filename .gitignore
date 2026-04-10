@@ -1,0 +1,59 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+MANIFEST
+
+# === Virtual environments ===
+.venv/
+venv/
+env/
+.env/
+
+# === PyInstaller ===
+*.spec.bak
+dist/
+build/
+
+# === IDE / editor ===
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs ===
+*.log
+blf_viewer_dev.log
+
+# === Measurement data — NEVER commit these ===
+*.blf
+*.MF4
+*.mf4
+
+# === DBC / database files — may contain proprietary signal definitions ===
+*.dbc
+*.arxml
+*.ldf
+
+# === Configuration saves — may contain local file paths ===
+*.json
+
+# === Test / scratch data ===
+test_data/
+scratch/
