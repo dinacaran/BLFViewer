@@ -1,0 +1,82 @@
+name: Build Portable Windows EXE
+
+# Triggers on every push of a version tag (e.g. v0.1.0)
+# Also allows manual trigger from the Actions tab
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Check out the repository ──────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ─────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      # ── 3. Install dependencies ───────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # ── 4. Build with PyInstaller ─────────────────────────────────────────
+      - name: Build portable EXE
+        run: |
+          pyinstaller BLFViewerPortable.spec
+
+      # ── 5. Verify build output exists ─────────────────────────────────────
+      - name: Verify output
+        run: |
+          if (!(Test-Path "dist\BLFViewer\BLFViewer.exe")) {
+            Write-Error "Build failed: BLFViewer.exe not found"
+            exit 1
+          }
+          Write-Host "Build succeeded."
+        shell: pwsh
+
+      # ── 6. Zip the dist folder ────────────────────────────────────────────
+      - name: Zip dist folder
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zipName = "BLFViewer_${tag}_Windows.zip"
+          Compress-Archive -Path "dist\BLFViewer\*" -DestinationPath $zipName
+          Write-Host "Created: $zipName"
+        shell: pwsh
+
+      # ── 7. Upload as a GitHub Release asset ──────────────────────────────
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BLFViewer_*_Windows.zip
+          generate_release_notes: true
+          body: |
+            ## BLF Viewer ${{ github.ref_name }}
+
+            ### Installation
+            1. Download `BLFViewer_${{ github.ref_name }}_Windows.zip`
+            2. Unzip anywhere
+            3. Run `BLFViewer.exe` — no Python installation required
+
+            ### Requirements
+            - Windows 10 or later (64-bit)
+
+            ### Changes
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+
+            ### Disclaimer
+            For offline analysis only. See [DISCLAIMER.md](https://github.com/${{ github.repository }}/blob/main/DISCLAIMER.md)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
