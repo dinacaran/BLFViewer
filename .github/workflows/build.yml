@@ -8,6 +8,10 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+# Explicit write permission required to create GitHub Releases
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Build on Windows
@@ -61,7 +65,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: BLFViewer_*_Windows.zip
-          generate_release_notes: true
+          generate_release_notes: false
           body: |
             ## BLF Viewer ${{ github.ref_name }}
 
