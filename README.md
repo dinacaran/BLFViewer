@@ -1,3 +1,4 @@
+![BLFviewer_Mutileaxis_plot](https://github.com/user-attachments/assets/e9f531d7-88e5-4292-8741-a5f2326ae3fd)
 ## BLF Viewer for window
 
 
@@ -13,8 +14,15 @@
 ---
 
 ## Screenshots
+Multiple Axis plot:
+![BLFviewer_Mutileaxis_plot_2](https://github.com/user-attachments/assets/e3f563f3-687e-4da7-8073-71570b88b69a)
 
-> __
+Stacked plot:
+![BLFviewer_stacked_plot_2](https://github.com/user-attachments/assets/8cc5735b-272b-4c88-baaa-384028d93fbe)
+
+Raw CAN frame:
+![BLFviewer_stacked_CANRawframe2](https://github.com/user-attachments/assets/68357783-3140-48f2-841d-89e2550ec593)
+
 
 ---
 
