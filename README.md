@@ -1,5 +1,4 @@
-![BLFviewer_Mutileaxis_plot](https://github.com/user-attachments/assets/e9f531d7-88e5-4292-8741-a5f2326ae3fd)
-## BLF Viewer for window
+## BLF Viewer for Window
 
 
 > A portable, zero-install Windows tool for loading Vector BLF measurement files,
