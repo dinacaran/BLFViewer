@@ -107,16 +107,24 @@ class PlotPanel(QWidget):
         self.plot.addItem(self.h_line, ignoreBounds=True)
 
         # ── Signal table ──────────────────────────────────────────────────
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(['Signal', 'Cursor Value', 'Unit', 'Samples'])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(['Signal', 'Cursor Value', 'Unit'])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.itemSelectionChanged.connect(self._emit_selection)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_table_menu)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hdr = self.table.horizontalHeader()
+        hdr.setStretchLastSection(False)
+        hdr.setStretchLastSection(False)
+        # Fix 1: all three columns user-resizable
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        self.table.setColumnWidth(0, 220)   # Signal
+        self.table.setColumnWidth(1, 110)   # Cursor Value
+        self.table.setColumnWidth(2, 60)    # Unit
 
         self.table_panel = QWidget()
         _tbl_layout = QVBoxLayout(self.table_panel)
@@ -232,6 +240,11 @@ class PlotPanel(QWidget):
         self.plot.addItem(self.h_line, ignoreBounds=True)
 
         # Clear stacked items
+        # Fix 2: disconnect stacked right-click before clearing scene
+        try:
+            self.glw.scene().sigMouseClicked.disconnect(self._on_stacked_scene_click)
+        except Exception:
+            pass
         self._stacked_vlines.clear()
         self._stacked_plots.clear()
         try:
@@ -305,10 +318,12 @@ class PlotPanel(QWidget):
 
     def _rebuild_stacked(self) -> None:
         """
-        Bug 4: INCA/CANdb-style stacked layout.
-        Each signal occupies its own row.  All plots share the X axis.
-        Only the bottom row shows X tick labels.
-        Left axis of each row is labelled with signal name + unit.
+        INCA/CANdb-style stacked layout.
+        - Each signal in its own row, shared X axis.
+        - Left axis label uses two-line HTML with pyqtgraph's -90° rotation:
+            Line 1: unit  → rotates to RIGHT side → inner (between tick numbers and signal name)
+            Line 2: name  → rotates to LEFT side  → outer (furthest from data)
+        - Both lines are part of the same axis label, so no TextItem tracking needed.
         """
         order = list(self._items.keys())
         n = len(order)
@@ -322,17 +337,24 @@ class PlotPanel(QWidget):
             p.showGrid(x=True, y=True, alpha=0.25)
             p.setMenuEnabled(False)
 
-            # Left Y-axis label (signal name + unit)
-            ylabel = series.signal_name
+            # Left axis: unit (inner) then signal name (outer), separated by <br>.
+            # pyqtgraph rotates the label -90° (CCW), so line 1 → right (inner) and
+            # line 2 → left (outer). This puts the unit between tick numbers and name.
             if series.unit:
-                ylabel += f'\n({series.unit})'
+                # Signal name first → outer (left after -90° rotation)
+                # Unit second → inner (right after -90° rotation, between tick numbers and name)
+                ylabel = (f'{series.signal_name}' +
+                          f'<br><span style="font-size:80%">({series.unit})</span>')
+            else:
+                ylabel = series.signal_name
             p.setLabel('left', ylabel, color=plotted.color)
             p.getAxis('left').setTextPen(pg.mkPen(plotted.color))
-            p.getAxis('left').setWidth(70)
+            # Wider axis to accommodate two side-by-side vertical text columns
+            p.getAxis('left').setWidth(85)
             p.showAxis('right', False)
             p.showAxis('top',   False)
 
-            # X axis: ticks only on bottom row
+            # X axis: tick labels only on the bottom row
             if idx < n - 1:
                 p.getAxis('bottom').setStyle(showValues=False)
                 p.getAxis('bottom').setLabel('')
@@ -340,7 +362,7 @@ class PlotPanel(QWidget):
             else:
                 p.setLabel('bottom', 'Time (seconds)')
 
-            # Link all rows to the first (shared X panning/zoom)
+            # Link X axis to first row
             if ref_plot is None:
                 ref_plot = p
             else:
@@ -425,6 +447,12 @@ class PlotPanel(QWidget):
         self._proxy = pg.SignalProxy(
             scene.sigMouseMoved, rateLimit=60, slot=self._mouse_moved
         )
+        # Fix 2: connect right-click handler for stacked mode
+        if self._stacked_mode and self._stacked_plots:
+            try:
+                self.glw.scene().sigMouseClicked.connect(self._on_stacked_scene_click)
+            except Exception:
+                pass
 
     # ── Mouse cursor ──────────────────────────────────────────────────────
 
@@ -454,7 +482,7 @@ class PlotPanel(QWidget):
             self.cursor_label.setText(f'Cursor t={x:.6f}, y={y:.6f}')
 
     def _update_table_values(self, x: float) -> None:
-        """Update Cursor Value column for ALL signals (Bug 2 scope fix)."""
+        """Update Cursor Value column for ALL signals."""
         row_lookup: dict[str, int] = {}
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
@@ -469,8 +497,12 @@ class PlotPanel(QWidget):
             if row is not None:
                 cell = self.table.item(row, 1)
                 if cell is not None:
-                    cell.setText(str(value))
-        self.table.resizeColumnsToContents()
+                    # Fix 1: limit to 3 decimal places for floats
+                    try:
+                        cell.setText(f"{float(value):.3f}")
+                    except (TypeError, ValueError):
+                        cell.setText(str(value))
+        # Fix 2: do NOT call resizeColumnsToContents — widths are user-controlled
 
     # ── Fit to window ─────────────────────────────────────────────────────
 
@@ -590,19 +622,17 @@ class PlotPanel(QWidget):
     def _refresh_table(self) -> None:
         self.table.setRowCount(len(self._items))
         for row, (key, plotted) in enumerate(self._items.items()):
-            signal_item  = QTableWidgetItem(key)
+            signal_item = QTableWidgetItem(key)
             signal_item.setData(Qt.ItemDataRole.UserRole, key)
-            cursor_item  = QTableWidgetItem('')
-            unit_item    = QTableWidgetItem(plotted.series.unit)
-            samples_item = QTableWidgetItem(str(len(plotted.series.timestamps)))
+            cursor_item = QTableWidgetItem('')
+            unit_item   = QTableWidgetItem(plotted.series.unit)
             brush = QBrush(QColor(plotted.color))
-            for item in (signal_item, cursor_item, unit_item, samples_item):
+            for item in (signal_item, cursor_item, unit_item):
                 item.setForeground(brush)
             self.table.setItem(row, 0, signal_item)
             self.table.setItem(row, 1, cursor_item)
             self.table.setItem(row, 2, unit_item)
-            self.table.setItem(row, 3, samples_item)
-        self.table.resizeColumnsToContents()
+        # Fix 2: do NOT call resizeColumnsToContents here — widths are user-controlled
 
     def _emit_selection(self) -> None:
         row = self.table.currentRow()
@@ -699,6 +729,17 @@ class PlotPanel(QWidget):
     def plotted_keys(self) -> list[str]:
         return list(self._items.keys())
 
+    def table_column_widths(self) -> list[int]:
+        """Return current widths of the 3 table columns (for config save)."""
+        return [self.table.columnWidth(i) for i in range(3)]
+
+    def set_table_column_widths(self, widths: list[int]) -> None:
+        """Restore column widths saved in a configuration file."""
+        for i, w in enumerate(widths):
+            if i < 3 and isinstance(w, int) and w > 0:
+                self.table.setColumnWidth(i, w)
+
+
     def _restore_selection(self, keys: list[str]) -> None:
         self.table.clearSelection()
         key_set = set(keys)
@@ -709,6 +750,37 @@ class PlotPanel(QWidget):
 
     # ── Context menus ─────────────────────────────────────────────────────
 
+    _MENU_STYLE = """
+        QMenu {
+            background-color: #2b2b2b;
+            color: #f0f0f0;
+            border: 1px solid #555555;
+        }
+        QMenu::item {
+            background-color: transparent;
+            color: #f0f0f0;
+            padding: 5px 24px 5px 12px;
+        }
+        QMenu::item:selected {
+            background-color: #3d6a9e;
+            color: #ffffff;
+        }
+        QMenu::item:disabled {
+            color: #777777;
+        }
+        QMenu::separator {
+            height: 1px;
+            background: #555555;
+            margin: 3px 0;
+        }
+    """
+
+    def _make_menu(self, parent=None) -> QMenu:
+        """Create a QMenu with a fixed dark style (Fix 3: immune to white background)."""
+        menu = QMenu(parent or self)
+        menu.setStyleSheet(self._MENU_STYLE)
+        return menu
+
     def _show_table_menu(self, position) -> None:
         selected_keys = self.selected_keys()
         row  = self.table.currentRow()
@@ -718,22 +790,54 @@ class PlotPanel(QWidget):
             selected_keys = [str(key)]
         if not selected_keys:
             return
-        menu = QMenu(self.table)
+        self._show_signal_menu(selected_keys, self.table.viewport().mapToGlobal(position))
+
+    def _show_signal_menu(self, selected_keys: list, global_pos) -> None:
+        """Shared signal context menu used by table and stacked plot right-click."""
+        menu = self._make_menu()
         if len(selected_keys) == 1:
-            act = QAction('Change signal color...', self.table)
+            act = QAction('Change signal color...', menu)
             act.triggered.connect(lambda: self._choose_color_for_key(str(selected_keys[0])))
             menu.addAction(act)
+            menu.addSeparator()
         for label, slot in [
             ('Move selected up',   self.move_selected_up),
             ('Move selected down', self.move_selected_down),
         ]:
-            a = QAction(label, self.table); a.triggered.connect(slot); menu.addAction(a)
+            a = QAction(label, menu)
+            a.triggered.connect(slot)
+            menu.addAction(a)
+        menu.addSeparator()
         rm_label = ('Remove selected signals' if len(selected_keys) > 1
                     else 'Remove selected signal')
-        rm = QAction(rm_label, self.table)
+        rm = QAction(rm_label, menu)
         rm.triggered.connect(self.remove_selected_series)
         menu.addAction(rm)
-        menu.exec(self.table.viewport().mapToGlobal(position))
+        menu.exec(global_pos)
+
+    def _on_stacked_scene_click(self, event) -> None:
+        """Right-click in stacked plot — detect row and show signal menu."""
+        try:
+            btn = event.button()
+        except Exception:
+            return
+        if btn != Qt.MouseButton.RightButton:
+            return
+        pos = event.scenePos()
+        keys = list(self._items.keys())
+        for i, p in enumerate(self._stacked_plots):
+            if p.sceneBoundingRect().contains(pos):
+                if i < len(keys):
+                    key = keys[i]
+                    self._restore_selection([key])
+                    # QCursor.pos() is always reliable for screen coordinates
+                    from PySide6.QtGui import QCursor
+                    self._show_signal_menu([key], QCursor.pos())
+                    try:
+                        event.accept()
+                    except Exception:
+                        pass
+                return
 
     def _install_plot_background_menu(self) -> None:
         pi   = getattr(self.plot, 'plotItem', None)
@@ -760,26 +864,31 @@ class PlotPanel(QWidget):
             self.set_background_color(chosen.name())
 
     def _show_plot_menu(self, position) -> None:
-        menu = QMenu(self.plot)
-        act  = QAction('Set Plot Background Color...', self.plot)
+        menu = self._make_menu()
+        act  = QAction('Set Plot Background Color...', menu)
         act.triggered.connect(self._choose_plot_background_color)
         menu.addAction(act)
         menu.exec(self.plot.mapToGlobal(position))
 
     def _apply_panel_background(self) -> None:
         bg = self._background_color
+        # Fix 3: header always grey/black — immune to plot background colour changes
         self.table_panel.setStyleSheet(f'''
             QWidget {{ background-color: {bg}; }}
             QLabel  {{ background-color: {bg}; color: white; }}
             QTableWidget {{
                 background-color: {bg};
                 alternate-background-color: {bg};
-                gridline-color: #333333;
+                gridline-color: #444444;
                 color: white;
                 selection-background-color: #2d4f7c;
             }}
             QHeaderView::section {{
-                background-color: {bg}; color: white; border: 1px solid #333333;
+                background-color: #4a4a4a;
+                color: #000000;
+                border: 1px solid #333333;
+                font-weight: bold;
+                padding: 3px;
             }}
         ''')
 

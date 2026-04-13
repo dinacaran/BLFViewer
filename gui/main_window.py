@@ -81,8 +81,6 @@ class MainWindow(QMainWindow):
         self.btn_move_up = QPushButton('Move Up')
         self.btn_move_down = QPushButton('Move Down')
         self.btn_remove = QPushButton('Remove Selected Plot')
-        self.btn_clear = QPushButton('Clear Plots')
-        self.btn_export = QPushButton('Export Selected CSV')
         self.btn_multi_axis = QPushButton('Multi-Axis')
         self.btn_multi_axis.setCheckable(True)
         self.btn_stacked = QPushButton('Stacked')
@@ -90,7 +88,7 @@ class MainWindow(QMainWindow):
         self.btn_raw_frames = QPushButton('Raw Frames')
         self.btn_points = QPushButton('Show Data Points')
         self.btn_points.setCheckable(True)
-        for btn in (self.btn_fit, self.btn_move_up, self.btn_move_down, self.btn_remove, self.btn_clear, self.btn_export, self.btn_multi_axis, self.btn_stacked, self.btn_raw_frames, self.btn_points):
+        for btn in (self.btn_fit, self.btn_move_up, self.btn_move_down, self.btn_remove, self.btn_multi_axis, self.btn_stacked, self.btn_raw_frames, self.btn_points):
             button_layout.addWidget(btn)
         button_layout.addStretch(1)
 
@@ -98,8 +96,6 @@ class MainWindow(QMainWindow):
         self.btn_move_up.clicked.connect(self.plot_panel.move_selected_up)
         self.btn_move_down.clicked.connect(self.plot_panel.move_selected_down)
         self.btn_remove.clicked.connect(self.plot_panel.remove_selected_series)
-        self.btn_clear.clicked.connect(self.plot_panel.clear_all)
-        self.btn_export.clicked.connect(self.export_selected_csv)
         self.btn_multi_axis.toggled.connect(self._toggle_multi_axis)
         self.btn_stacked.toggled.connect(self._toggle_stacked)
         self.btn_raw_frames.clicked.connect(self.show_raw_frames)
@@ -263,6 +259,8 @@ class MainWindow(QMainWindow):
             'plot_background_color': self.plot_panel.background_color(),
             'signal_colors': self.plot_panel.series_colors(),
             'multi_axis': self.btn_multi_axis.isChecked(),
+            'stacked': self.btn_stacked.isChecked(),           # Fix 4
+            'table_column_widths': self.plot_panel.table_column_widths(),  # Fix 2
         }
         path, _ = QFileDialog.getSaveFileName(self, 'Save configuration', 'blf_viewer_config.json', 'JSON Files (*.json)')
         if not path:
@@ -284,15 +282,52 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, 'Load configuration failed', str(exc))
             return
-        self.blf_path = data.get('blf_path')
-        self.dbc_path = data.get('dbc_path')
-        self._pending_plot_keys = list(data.get('signals') or [])
-        self._pending_plot_colors = dict(data.get('signal_colors') or {})
+
+        cfg_blf = data.get('blf_path')
+        cfg_dbc = data.get('dbc_path')
+        pending_keys   = list(data.get('signals') or [])
+        pending_colors = dict(data.get('signal_colors') or {})
+
+        # Fix 6: if data is already decoded, ask the user what to do
+        use_current_data = False
+        if self.store is not None:
+            reply = QMessageBox.question(
+                self,
+                'Data already loaded',
+                'A BLF/DBC is already decoded in memory.\n\n'
+                'What would you like to do?\n\n'
+                '  Yes — keep current data, plot signals from config\n'
+                '  No  — reload BLF/DBC paths from configuration file',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            use_current_data = (reply == QMessageBox.StandardButton.Yes)
+
+        # Apply visual settings regardless of data source
         self.btn_points.setChecked(bool(data.get('show_data_points', False)))
         bg = data.get('plot_background_color')
         if bg:
             self.plot_panel.set_background_color(str(bg))
         self.btn_multi_axis.setChecked(bool(data.get('multi_axis', False)))
+        self.btn_stacked.setChecked(bool(data.get('stacked', False)))     # Fix 4
+        col_widths = data.get('table_column_widths')                       # Fix 2
+        if col_widths:
+            self.plot_panel.set_table_column_widths([int(w) for w in col_widths])
+
+        if use_current_data:
+            # Fix 6: reuse already-decoded store — just plot requested signals
+            self._log(f'Configuration loaded (using current data): {path}')
+            self._update_status('Config applied', 'Plotting signals from configuration')
+            self.add_signals_to_plot(pending_keys)
+            for key, color in pending_colors.items():
+                self.plot_panel.set_series_color(key, color)
+            return
+
+        # Reload from config BLF/DBC paths
+        self.blf_path = cfg_blf
+        self.dbc_path = cfg_dbc
+        self._pending_plot_keys   = pending_keys
+        self._pending_plot_colors = pending_colors
         self._update_measurement_tab()
         if not self.blf_path or not self.dbc_path:
             QMessageBox.warning(self, 'Incomplete configuration', 'The configuration file does not contain both BLF and DBC paths.')

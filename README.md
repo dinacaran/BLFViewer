@@ -1,20 +1,18 @@
-## BLF Viewer for window
-
+# BLF Viewer
 
 > A portable, zero-install Windows tool for loading Vector BLF measurement files,
 > decoding CAN signals with DBC databases, and plotting them interactively.
 
-
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Release](https://img.shields.io/github/v/release/dinacaran/blfviewer)
+![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/blf-viewer)
 
 ---
 
 ## Screenshots
 
-> __
+> _Add screenshots here — drag images into this section on GitHub_
 
 ---
 
@@ -40,7 +38,7 @@
 **Requirements:** Python 3.11 or later
 
 ```bash
-git clone https://github.com/dinacaran/blfviewer.git
+git clone https://github.com/YOUR_USERNAME/blf-viewer.git
 cd blf-viewer
 pip install -r requirements.txt
 python app.py
@@ -48,7 +46,7 @@ python app.py
 
 ### Download Portable .exe (Windows)
 
-Go to the [Releases](https://github.com/dinacaran/blfviewer/releases) page
+Go to the [Releases](https://github.com/YOUR_USERNAME/blf-viewer/releases) page
 and download the latest `BLFViewer_vX.X.X_Windows.zip`.  
 Unzip anywhere and run `BLFViewer.exe` — no installation needed.
 
@@ -82,7 +80,7 @@ Unzip anywhere and run `BLFViewer.exe` — no installation needed.
 
 ```bash
 pip install pyinstaller
-pyinstaller BLFViewerPortable.spec
+pyinstaller BLFViewer.spec
 ```
 
 Output is in `dist/BLFViewer/` — zip that folder and distribute.
@@ -109,7 +107,7 @@ blf-viewer/
 │   ├── signal_tree.py          # Left-panel signal tree
 │   └── raw_frame_dialog.py     # Raw CAN frame viewer
 ├── requirements.txt
-├── BLFViewerPortable.spec      # PyInstaller spec
+├── BLFViewer.spec              # PyInstaller spec
 └── .github/workflows/build.yml # Auto-build on release tag
 ```
 
@@ -133,7 +131,7 @@ All dependencies are compatible with MIT distribution.
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
-Found a bug? [Open an issue](https://github.com/dinacaran/blfviewer/issues) with:
+Found a bug? [Open an issue](https://github.com/YOUR_USERNAME/blf-viewer/issues) with:
 - Your OS and Python version
 - A minimal description of the BLF / DBC setup (no proprietary data needed)
 - The full error message or unexpected behaviour
@@ -152,6 +150,3 @@ Vector Informatik GmbH is not affiliated with this project.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-#   B L F V i e w e r 
- 
- 
