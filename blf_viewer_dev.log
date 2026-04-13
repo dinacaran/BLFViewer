@@ -1,0 +1,22 @@
+BLF Viewer v0.1.0 started.
+Dev log file: C:\Users\dinac\Downloads\BLFViewer_v0.1.9\home\claude\blfviewer_v21\blf_viewer_dev.log
+Plot background color changed: #ffffff
+Configuration loaded: C:/Users/dinac/Downloads/blf_viewer_config.json
+Starting BLF load and DBC decode...
+Loading DBC...
+WARNING: Strict DBC validation failed. Retrying with compatibility mode (strict=False).
+Strict mode details: DBC: "The signal DrvrBltTnsnrIgntorLoopResistance does not fit in message ILI."
+DBC loaded in compatibility mode. Some malformed signals may decode differently than in Vector tools.
+DBC messages available: 549
+Opening BLF and starting decode...
+Processed 1 frames | channels found: 1 | decoded frames: 1 | samples: 9
+Processed 10,000 frames | channels found: 2 | decoded frames: 9,980 | samples: 91,663
+Processed 20,000 frames | channels found: 2 | decoded frames: 19,959 | samples: 183,319
+Channels: 2 | CH0 (22,548 frames), CH1 (6,527 frames)
+Completed | total frames: 29,075 | decoded frames: 29,015 | unmatched frames: 60 | samples: 266,447
+Decode finished successfully.
+Signal color changed: CH0::EEC1::EngSpeed -> #e41a1c
+Signal color changed: CH0::EEC2::AccelPedalPos1 -> #377eb8
+Signal color changed: CH1::ET1::EngIntercoolerTemp -> #4daf4a
+Signal color changed: CH0::EBC1::ASRHillHolderSwitch -> #f781bf
+Signal color changed: CH0::EBC5::XBRSystemState -> #1f77b4

@@ -497,11 +497,15 @@ class PlotPanel(QWidget):
             if row is not None:
                 cell = self.table.item(row, 1)
                 if cell is not None:
-                    # Fix 1: limit to 3 decimal places for floats
-                    try:
-                        cell.setText(f"{float(value):.3f}")
-                    except (TypeError, ValueError):
-                        cell.setText(str(value))
+                    # Enum signals: raw_value is a string label — show as-is
+                    # Numeric signals: show to 3 dp
+                    if isinstance(value, str):
+                        cell.setText(value)
+                    else:
+                        try:
+                            cell.setText(f"{float(value):.3f}")
+                        except (TypeError, ValueError):
+                            cell.setText(str(value))
         # Fix 2: do NOT call resizeColumnsToContents — widths are user-controlled
 
     # ── Fit to window ─────────────────────────────────────────────────────

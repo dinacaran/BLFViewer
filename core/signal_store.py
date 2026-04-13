@@ -127,10 +127,16 @@ class SignalStore:
             series = self._series_by_key[key]
             series.timestamps.append(sample.timestamp)
             series.raw_values.append(sample.value)
-            try:
-                series.values.append(float(sample.value))
-            except (TypeError, ValueError):
-                series.values.append(float('nan'))
+            # Use pre-computed numeric_value (handles enum/choice signals).
+            # Falls back to float(sample.value) for older callers without the field.
+            numeric = getattr(sample, 'numeric_value', None)
+            if numeric is not None:
+                series.values.append(numeric)
+            else:
+                try:
+                    series.values.append(float(sample.value))
+                except (TypeError, ValueError):
+                    series.values.append(float('nan'))
             self.total_samples += 1
 
     def add_raw_frame(self, frame: RawFrame, samples: Iterable[DecodedSignalSample]) -> None:

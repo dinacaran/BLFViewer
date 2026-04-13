@@ -18,10 +18,11 @@ class DecodedSignalSample:
     message_id: int
     message_name: str
     signal_name: str
-    value: float | int | str
+    value: float | int | str      # raw decoded value (string for enum signals)
     unit: str
     is_extended_id: bool
     direction: str
+    numeric_value: float | None = None  # numeric key for enum signals (used for plotting)
 
 
 class DBCLoadError(RuntimeError):
@@ -86,10 +87,11 @@ class DBCDecoder:
                 if pgn is not None:
                     self._messages_pgn.setdefault(pgn, []).append(message)
 
-    def _decode_kwargs(self) -> dict[str, Any]:
+    def _decode_kwargs(self, decode_choices: bool = False) -> dict[str, Any]:
         if self._decode_signature is None:
             self._decode_signature = inspect.signature(self.database.messages[0].decode) if self.database.messages else None
-        kwargs: dict[str, Any] = {"decode_choices": True, "scaling": True}
+        # decode_choices=False: always get raw numeric values; we do label lookup manually
+        kwargs: dict[str, Any] = {"decode_choices": decode_choices, "scaling": True}
         if self._decode_signature is not None:
             params = self._decode_signature.parameters
             if "allow_truncated" in params:
@@ -152,7 +154,7 @@ class DBCDecoder:
                 decoded = message.decode(payload, **self._decode_kwargs())
             except TypeError:
                 try:
-                    decoded = message.decode(payload, decode_choices=True, scaling=True)
+                    decoded = message.decode(payload, decode_choices=False, scaling=True)
                 except Exception:
                     self.stats["decode_fail"] += 1
                     continue
@@ -167,11 +169,30 @@ class DBCDecoder:
                 self.stats["decode_fail"] += 1
                 continue
 
+            # decoded contains raw numeric values (decode_choices=False).
+            # For enum signals we do a forward lookup to get the display label.
             samples: list[DecodedSignalSample] = []
             for signal in getattr(message, "signals", []):
                 if signal.name not in decoded:
                     continue
-                value = decoded[signal.name]
+
+                raw = decoded[signal.name]   # always numeric (int/float) — never a string
+
+                # numeric_value for plotting: always a float
+                try:
+                    numeric_value: float | None = float(raw)
+                except (TypeError, ValueError):
+                    numeric_value = None
+
+                # display_value for table: use choices label when available
+                choices: dict = getattr(signal, "choices", None) or {}
+                if choices and numeric_value is not None:
+                    # Forward lookup: integer key → label string
+                    label = choices.get(int(numeric_value))
+                    display_value: Any = str(label) if label is not None else raw
+                else:
+                    display_value = raw
+
                 samples.append(
                     DecodedSignalSample(
                         timestamp=frame.timestamp,
@@ -179,10 +200,11 @@ class DBCDecoder:
                         message_id=frame.arbitration_id,
                         message_name=message.name,
                         signal_name=signal.name,
-                        value=value,
+                        value=display_value,       # string label or raw numeric
                         unit=signal.unit or "",
                         is_extended_id=frame.is_extended_id,
                         direction=frame.direction,
+                        numeric_value=numeric_value,  # always float — drives the plot
                     )
                 )
             if samples:
