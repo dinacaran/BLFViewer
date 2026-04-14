@@ -82,7 +82,8 @@ jobs:
           organization-id:              '${{ secrets.SIGNPATH_ORG_ID }}'
           project-slug:                 'BLFViewer'
           signing-policy-slug:          'release-signing'
-          artifact-configuration-slug:  'initial-version'
+          signing-policy-slug:          'BLFViewer_v'
+          artifact-configuration-slug:  'initial'
           github-artifact-id:           '${{ needs.build.outputs.artifact-id }}'
           github-token:                 '${{ secrets.GITHUB_TOKEN }}'
           wait-for-completion:          true
