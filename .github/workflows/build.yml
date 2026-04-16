@@ -1,4 +1,4 @@
-name: Build, Sign and Release
+name: Build and Release
 
 on:
   push:
@@ -8,16 +8,11 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
-  # ── Job 1: Build ────────────────────────────────────────────────────────
   build:
     name: Build on Windows
     runs-on: windows-latest
-    outputs:
-      artifact-id: ${{ steps.upload.outputs.artifact-id }}
-      zip-name: ${{ steps.zip.outputs.zip-name }}
 
     steps:
       - name: Checkout
@@ -48,66 +43,12 @@ jobs:
           Write-Host "Build succeeded."
 
       - name: Zip dist folder
-        id: zip
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           $zipName = "BLFViewer_${tag}_Windows.zip"
           Compress-Archive -Path "dist\BLFViewer\*" -DestinationPath $zipName
-          echo "zip-name=$zipName" >> $env:GITHUB_OUTPUT
           Write-Host "Created: $zipName"
-
-      # Upload artifact — capture the artifact-id for SignPath
-      - name: Upload unsigned artifact
-        id: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-zip
-          path: BLFViewer_*_Windows.zip
-          retention-days: 1
-
-  # ── Job 2: Sign via SignPath ─────────────────────────────────────────────
-  sign:
-    name: Sign with SignPath
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      signed-dir: signed-output
-
-    steps:
-      - name: Sign via SignPath Foundation
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token:                    '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id:              '${{ secrets.SIGNPATH_ORG_ID }}'
-          project-slug:                 'BLFViewer'
-          signing-policy-slug:          'BLFViewer_v'
-          artifact-configuration-slug:  'initial'
-          github-artifact-id:           '${{ needs.build.outputs.artifact-id }}'
-          github-token:                 '${{ secrets.GITHUB_TOKEN }}'
-          wait-for-completion:          true
-          output-artifact-directory:    'signed-output'
-          wait-for-completion-timeout-in-seconds: 600
-
-      # Upload signed output so the release job can download it
-      - name: Upload signed artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: signed-zip
-          path: signed-output/
-          retention-days: 1
-
-  # ── Job 3: Publish GitHub Release ────────────────────────────────────────
-  release:
-    name: Publish Release
-    needs: [build, sign]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download signed artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: signed-zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -122,15 +63,12 @@ jobs:
             2. Unzip anywhere
             3. Run `BLFViewer.exe` — no Python installation required
 
-            > ✅ Digitally signed — Publisher: **GDLabs**
+            > ⚠️ This release is unsigned. Windows may show a SmartScreen warning — click More info → Run anyway.
 
             ### Requirements
             - Windows 10 or later (64-bit)
 
             ### Changes
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
-
-            ### Disclaimer
-            For offline analysis only. See [DISCLAIMER.md](https://github.com/${{ github.repository }}/blob/main/DISCLAIMER.md)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

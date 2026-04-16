@@ -130,6 +130,13 @@ class PlotPanel(QWidget):
         _tbl_layout = QVBoxLayout(self.table_panel)
         _tbl_layout.setContentsMargins(0, 0, 0, 0)
         _tbl_layout.addWidget(self.table, stretch=1)
+        # Drag-and-drop onto the signal table (same as plot area)
+        self.table.setAcceptDrops(True)
+        self.table.viewport().setAcceptDrops(True)
+        self.table.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
+        self.table.dragEnterEvent = self._table_drag_enter
+        self.table.dragMoveEvent  = self._table_drag_enter   # same check
+        self.table.dropEvent      = self._table_drop
         self._apply_panel_background()
 
         # ── Root layout ───────────────────────────────────────────────────
@@ -733,6 +740,32 @@ class PlotPanel(QWidget):
     def plotted_keys(self) -> list[str]:
         return list(self._items.keys())
 
+    def refresh_plotted_curves(self) -> None:
+        """
+        Re-read data from live SignalSeries references and update curves.
+        Called periodically during decode so plots grow in real time.
+        Thread-safe in CPython: array.array.append() is GIL-protected.
+        """
+        if not self._items:
+            return
+        for plotted in self._items.values():
+            if plotted.curve is not None:
+                self._apply_curve_style(plotted)
+        # Auto-fit x range as data grows
+        try:
+            all_ts = [ts for it in self._items.values()
+                      for ts in it.series.timestamps]
+            if all_ts:
+                x_max = max(all_ts)
+                x_min = min(all_ts)
+                if self._stacked_mode:
+                    for p in self._stacked_plots:
+                        p.setXRange(x_min, x_max, padding=0.02)
+                else:
+                    self.plot.setXRange(x_min, x_max, padding=0.02)
+        except Exception:
+            pass
+
     def table_column_widths(self) -> list[int]:
         """Return current widths of the 3 table columns (for config save)."""
         return [self.table.columnWidth(i) for i in range(3)]
@@ -743,6 +776,27 @@ class PlotPanel(QWidget):
             if i < 3 and isinstance(w, int) and w > 0:
                 self.table.setColumnWidth(i, w)
 
+
+    # ── Drag-and-drop onto the signal table ─────────────────────────────
+
+    def _table_drag_enter(self, event) -> None:
+        if event.mimeData().hasFormat(SignalTreeWidget.MIME_TYPE):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _table_drop(self, event) -> None:
+        if not event.mimeData().hasFormat(SignalTreeWidget.MIME_TYPE):
+            event.ignore()
+            return
+        payload = bytes(event.mimeData().data(
+            SignalTreeWidget.MIME_TYPE)).decode('utf-8')
+        keys = [p.strip() for p in payload.splitlines() if p.strip()]
+        if keys:
+            self.signalDropped.emit(keys)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def _restore_selection(self, keys: list[str]) -> None:
         self.table.clearSelection()

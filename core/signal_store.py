@@ -85,6 +85,7 @@ class SignalStore:
         # Bug 3 fix: bounded; stops storing after _MAX_RAW_FRAMES
         self.raw_frames: list[RawFrameEntry] = []
         self._raw_frames_capped = False
+        self.base_ts: float = 0.0  # set by LoadWorker for streaming
 
     def note_frame(self, frame: RawFrame, decoded: bool = False) -> None:
         self.total_frames += 1
@@ -139,6 +140,44 @@ class SignalStore:
                     series.values.append(float('nan'))
             self.total_samples += 1
 
+    def add_samples_direct(self, samples: list) -> None:
+        """
+        Like add_samples() but accepts an already-materialised list directly.
+        Avoids the list() re-wrap overhead in the hot decode loop.
+        """
+        if not samples:
+            return
+        self.decoded_frames += 1
+        self.unmatched_frames = max(0, self.unmatched_frames - 1)
+        for sample in samples:
+            self.channels.add(sample.channel)
+            self.message_hits[(sample.channel, sample.message_name)] += 1
+            key = self._make_key(sample.channel, sample.message_name, sample.signal_name)
+            if key not in self._series_by_key:
+                series = SignalSeries(
+                    channel=sample.channel,
+                    message_name=sample.message_name,
+                    message_id=sample.message_id,
+                    signal_name=sample.signal_name,
+                    unit=sample.unit,
+                )
+                self._series_by_key[key] = series
+                sigs = self._signals_by_channel_message[sample.channel][sample.message_name]
+                if sample.signal_name not in sigs:
+                    sigs.append(sample.signal_name)
+            series = self._series_by_key[key]
+            series.timestamps.append(sample.timestamp)
+            series.raw_values.append(sample.value)
+            numeric = sample.numeric_value
+            if numeric is not None:
+                series.values.append(numeric)
+            else:
+                try:
+                    series.values.append(float(sample.value))
+                except (TypeError, ValueError):
+                    series.values.append(float('nan'))
+            self.total_samples += 1
+
     def add_raw_frame(self, frame: RawFrame, samples: Iterable[DecodedSignalSample]) -> None:
         # Bug 3 fix: stop accumulating after cap to prevent OOM on large BLF files.
         if self._raw_frames_capped:
@@ -172,8 +211,21 @@ class SignalStore:
             )
         )
 
-    def normalize_timestamps(self) -> None:
-        """Shift all timestamps so that t=0 is the start of the recording."""
+    def normalize_timestamps(self, already_normalized: bool = False) -> None:
+        """
+        Shift all timestamps so that t=0 is the start of the recording.
+        If already_normalized=True (inline normalisation was done by LoadWorker),
+        only the raw_frames need correcting (their timestamps were set before subtraction).
+        """
+        if already_normalized:
+            # Timestamps in SignalSeries are already correct (subtracted in LoadWorker).
+            # raw_frames store the original absolute timestamps → correct them now.
+            for frame in self.raw_frames:
+                frame.time_s           -= self.base_ts
+                frame.start_of_frame_s -= self.base_ts
+            return
+
+        # Legacy path: full normalisation pass (used if called without LoadWorker)
         min_ts: float | None = None
         for series in self._series_by_key.values():
             if series.timestamps:
@@ -184,12 +236,11 @@ class SignalStore:
             return
         for series in self._series_by_key.values():
             if series.timestamps:
-                # Rebuild array.array in-place (fast, no extra list allocation)
                 new_ts = _array.array('d', (t - min_ts for t in series.timestamps))
                 series.timestamps = new_ts
         for frame in self.raw_frames:
-            frame.time_s             -= min_ts
-            frame.start_of_frame_s   -= min_ts
+            frame.time_s           -= min_ts
+            frame.start_of_frame_s -= min_ts
 
     def get_series(self, key: str) -> SignalSeries | None:
         return self._series_by_key.get(key)

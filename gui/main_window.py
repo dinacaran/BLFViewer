@@ -357,6 +357,9 @@ class MainWindow(QMainWindow):
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.finished.connect(self._thread.quit)
         self._worker.failed.connect(self._thread.quit)
+        # Streaming: update tree and plots while decoding
+        self._worker.tree_update.connect(self._on_tree_update)
+        self._worker.partial_ready.connect(self._on_partial_ready)
         self._thread.finished.connect(self._cleanup_worker)
         self._thread.start()
 
@@ -372,9 +375,13 @@ class MainWindow(QMainWindow):
             self._update_status(f'Plotted {plotted} signal(s)', 'Use Fit to Window, reorder, or export selected CSV')
 
     def add_signal_to_plot(self, key: str, fit: bool = True) -> bool:
-        if not self.store:
+        # Allow plotting from partial store while decoding is in progress
+        active_store = self.store
+        if active_store is None and self._worker is not None:
+            active_store = getattr(self._worker, '_live_store', None)
+        if not active_store:
             return False
-        series = self.store.get_series(key)
+        series = active_store.get_series(key)
         if not series:
             self._log(f'Signal not found: {key}')
             return False
@@ -401,8 +408,20 @@ class MainWindow(QMainWindow):
         self._log(message)
         self._update_status(message, 'Wait for decode to finish')
 
+    def _on_tree_update(self, payload: dict) -> None:
+        """Show available signals in tree while decoding is still running."""
+        self.signal_tree.set_payload(payload)
+
+    def _on_partial_ready(self) -> None:
+        """Refresh any live-plotted curves with new samples decoded so far."""
+        if self.store is None and self._worker is not None:
+            # Store is being built by the worker — get reference via worker
+            pass   # curves hold direct series references — just redraw
+        self.plot_panel.refresh_plotted_curves()
+
     def _on_worker_finished(self, store: SignalStore) -> None:
         self.store = store
+        # Expose store immediately so pending plots and post-decode plots work
         self.signal_tree.set_payload(store.build_tree_payload())
         self.diagnostics_box.setPlainText(store.diagnostics_text)
         self._update_measurement_tab(
