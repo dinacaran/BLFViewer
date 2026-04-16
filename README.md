@@ -10,7 +10,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Release](https://img.shields.io/github/v/release/dinacaran/blfviewer)
 
----
+--
 
 ## Screenshots
 Multiple Axis plot:
