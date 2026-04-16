@@ -12,13 +12,13 @@
 
 ## Screenshots
 Stacked plot:
-![Uploading Stacked_plot.jpg…]()
 <img width="3582" height="2423" alt="Stacked_plot" src="https://github.com/user-attachments/assets/91ec3794-cbb9-46ba-a6d2-531d02278bd2" />
 
 Multiple Axis plot:
-
 <img width="2376" height="1586" alt="Multi_plot" src="https://github.com/user-attachments/assets/efc7b429-befa-4344-bed3-4d5c2151ca98" />
 
+Full tool view:
+<img width="2556" height="1656" alt="BLF Viewer full view" src="https://github.com/user-attachments/assets/239b7dd1-948a-498b-a309-07e967dcc94d" />
 ## Features
 
 - **Load Vector `.blf` files** — via the open-source `python-can` library
