@@ -10,20 +10,14 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Release](https://img.shields.io/github/v/release/dinacaran/blfviewer)
 
---
-
 ## Screenshots
-Multiple Axis plot:
-![BLFviewer_Mutileaxis_plot_2](https://github.com/user-attachments/assets/e3f563f3-687e-4da7-8073-71570b88b69a)
-
 Stacked plot:
-![BLFviewer_stacked_plot_2](https://github.com/user-attachments/assets/8cc5735b-272b-4c88-baaa-384028d93fbe)
+![Uploading Stacked_plot.jpg…]()
+<img width="3582" height="2423" alt="Stacked_plot" src="https://github.com/user-attachments/assets/91ec3794-cbb9-46ba-a6d2-531d02278bd2" />
 
-Raw CAN frame:
-![BLFviewer_stacked_CANRawframe2](https://github.com/user-attachments/assets/68357783-3140-48f2-841d-89e2550ec593)
+Multiple Axis plot:
 
-
----
+<img width="2376" height="1586" alt="Multi_plot" src="https://github.com/user-attachments/assets/efc7b429-befa-4344-bed3-4d5c2151ca98" />
 
 ## Features
 
